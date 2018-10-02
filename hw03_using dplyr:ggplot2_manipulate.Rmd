@@ -1,0 +1,12 @@
+---
+title: "Use dplyr/ggplot2 to manipulate and explore data"
+author: "Zuheng(David) Xu"
+date: '2018-09-30'
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+

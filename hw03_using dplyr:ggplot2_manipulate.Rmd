@@ -3,10 +3,202 @@ title: "Use dplyr/ggplot2 to manipulate and explore data"
 author: "Zuheng(David) Xu"
 date: '2018-09-30'
 output: github_document
+  
+    
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+
+
+## Introduction
+In this assignmentm, I intended to get a deeper dive into using `dylyr` and `ggplot2` to manipulate and visualize data.
+
+Here are all the packages would be used:
+
+```{r ,message=FALSE}
+library(tidyverse)
+library(gapminder)
+library(ggplot2)
+library(knitr)
+```
+
+I will choose several tasks from the task menu:
+
+* Get the maximum and minimum of GDP per capita for all continents.
+* Look at the spread of GDP per capita within the continents.
+* Compute a trimmed mean of life expectancy for different years. Or a weighted mean, weighting by population. Just try something other than the plain vanilla mean.
+* How is life expectancy changing over time on different continents.
+
+## Task menu
+
+### (1) Get the maximum and minimum of GDP per capita for all continents
+
+I summarize the grouped data and generate a table to show the max and min GDP percapita in each continent.
+
+```{r}
+gapminder %>% 
+  group_by(continent) %>% 
+  summarize(Min= min(gdpPercap),
+            Max=max(gdpPercap)) %>% 
+  knitr::kable()
+```
+
+The data visualization will be shown in the next section by using boxplot.
+
+### (2) Look at the spread of GDP per capita within the continents
+
+First of all, let's have a general opinion by density graph.
+
+```{r}
+#multiple density of gdpPercap grouped by continent
+ggplot(gapminder, aes(gdpPercap, fill= continent)) +
+  geom_density(alpha=0.3) +
+  labs( title="Densities of GDP per capita for each continent")
+# we can also using facet_grid
+ggplot(gapminder, aes(gdpPercap, fill= continent)) +
+  geom_histogram(alpha=0.6,bins=50) +
+  labs( title="Histograms of GDP per capita for each continent")+
+  facet_grid(continent~.,scales = "free_y")
+
+```
+
+It's obvious that huge difference of the distribution between cosntinents exists. For example, Africa has lower GDP per capita and smaller variantion, while Oceania shows higher GDP per capita and wider spread.
+
+Then, we can explore more details such as median mean and IQR by using side_by_side box plot.
+
+```{r}
+#jitter plot + boxplot + violin, factored by continent
+
+gapminder %>% 
+  group_by(continent) %>% 
+  ggplot(aes(continent,gdpPercap))+
+  geom_violin(fill="cornflowerblue")+
+  geom_boxplot(fill= "lightblue",width=0.5,alpha=0.5,notch=TRUE)+
+  geom_jitter(col="#0353A4", alpha= 0.1)+
+  labs(title="Boxplot of GDP percap in each continent")
+```
+
+It's interesting that even though Asia has low GDP percapita over all, there are several rich countries leading the whole world. Also, continents with lower GDP percap tend to have more outliers, which inspire us to see the box plot in each country.
+
+```{r}
+#boxplot, factored by country, grouped by continent
+gapminder %>% 
+  ggplot(aes(country,gdpPercap,color=continent,shape=continent))+
+  geom_boxplot(alpha=0.5)+
+  facet_grid(continent~.,scale="free_y")+
+  labs(title="Boxplot for GDP percap in each country")
+```
+
+
+Lastly, I will use a table to show some numeric statistics about GDP percap in each continent.
+
+```{r}
+#table for numerical statistics
+gapminder %>% 
+  group_by(continent) %>% 
+  summarize(Min=min(gdpPercap),
+            Mean=mean(gdpPercap),
+            Median = median(gdpPercap),
+            IQR= IQR(gdpPercap),
+            Max= max(gdpPercap)
+) %>% 
+  knitr::kable()
+```
+
+### (3) Mean `LifeExp` computation
+
+The requirement for the mean computation is:
+
+> Compute a trimmed mean of life expectancy for different years. Or a weighted mean, weighting by population. Just try something other than the plain vanilla mean.
+
+Therefore, in this seciton, I will apply 3 computations of life expectancy: trimmed/weighted/normal mean of life expectancy for different years. and visualize the data with `ggoplot2`.
+
+
+```{r,message=FALSE}
+#calculation 
+
+#trimed data(10% of the ends discarded) 
+trim= gapminder %>% 
+  group_by(year) %>% 
+  summarize(trimed_mean = mean(lifeExp,trim= 0.1)) %>% 
+              arrange(year)
+
+#normal mean            
+norm= gapminder %>% 
+  group_by(year) %>% 
+  summarize(mean = mean(lifeExp)) %>% 
+              arrange(year)
+#weighted by population
+weight=gapminder %>% 
+  group_by(year) %>% 
+  summarize(weighted_mean = weighted.mean(lifeExp,pop))%>% 
+              arrange(year)
+            
+```
+
+```{r}
+#bind into 1 data and generate a table
+# store as a because i will plot this table
+a= cbind(norm, trim$trimed_mean,weight$weighted_mean) %>% 
+  rename("trimed_mean"="trim$trimed_mean","weighted_mean"="weight$weighted_mean")
+
+
+
+a %>% knitr::kable()
+  
+```
+
+To see the tendency of the change of the means, I will use line graph to illustrate.
+
+```{r,message=FALSE}
+#using gather function ,then group
+a %>% 
+  gather(key="type_of_mean",value="value", contains("mean")) %>% 
+  group_by(as.factor(type_of_mean))%>% 
+  ggplot(aes(year,value))+geom_point(aes(shape=type_of_mean)) + geom_line(aes(color=type_of_mean))+
+  labs(title= "Lines for means change")
+
+```
+
+
+### (4) How is life expectancy changing over time on different continents
+
+First of all, I'll present the mean of `lifeExp` each year each continent into a table.Since the table is too long, it will be hide.
+
+```{r,message = FALSE}
+#table of mean lifeexp grrouped by year and continent
+b=gapminder %>% 
+  group_by(continent,year) %>% 
+  summarize(mean_lifeexp= mean(lifeExp)) 
+b %>% 
+  knitr::kable()
+  
+```
+
+A graph would help to illustrate the change by year.
+
+```{r}
+b %>% 
+  ggplot(aes(year,mean_lifeexp,color= continent)) +
+  geom_smooth(se =FALSE,size=1)+
+  geom_point()
+```
+
+Then, I calculated the exact change in each year.
+
+```{r}
+gapminder %>% 
+  group_by(continent) %>% 
+  mutate(change = lifeExp -lag(lifeExp,1)) %>%
+  drop_na() %>%  #since there is NA in first year
+  ggplot(aes(year,change,color =continent,shape=continent))+
+  geom_smooth() + geom_point(alpha=0.5)+
+  facet_grid(continent~.)+
+  labs(title="Change of lifeExp in each year")
+```
+
+We can see that  the change of life expectancy for all continents is around 0 after 1960. For Americas,Europe and Ocieania, the change of each country is consitent, while other 2 continents have much wider variation between countries.  
 
 
